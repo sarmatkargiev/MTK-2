@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>МТК-2</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6d4fd6">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f4f1fb;--card:#fff;--ink:#1a1a1a;--muted:#6b6780;--acc:#6d4fd6;--line:#1a1a1a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15131d;--card:#201d2c;--ink:#f1eefb;--muted:#a49fbb;--acc:#a68cff;--line:#f1eefb}}
+:root[data-theme="dark"]{--bg:#15131d;--card:#201d2c;--ink:#f1eefb;--muted:#a49fbb;--acc:#a68cff;--line:#f1eefb}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app{max-width:440px;margin:0 auto;padding:16px;min-height:100vh;display:flex;flex-direction:column;gap:22px}
+.top{display:flex;justify-content:space-between}
+.ib{width:46px;height:46px;border-radius:50%;border:2px solid var(--line);background:var(--card);color:var(--ink);font-size:22px;cursor:pointer}
+.modes{display:flex;gap:10px;margin-top:20px}
+.mode{flex:1;padding:12px 8px;border-radius:999px;border:2px solid var(--line);background:var(--card);color:var(--ink);font-size:16px;cursor:pointer}
+.mode.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.inp{display:flex;border:2px solid var(--line);background:var(--card);border-radius:10px;overflow:hidden}
+textarea{flex:1;border:0;outline:0;resize:none;min-height:110px;padding:14px;font:inherit;font-size:17px;background:transparent;color:var(--ink)}
+.go{width:56px;border:0;background:transparent;color:var(--acc);font-size:28px;cursor:pointer}
+.out{border:2px solid var(--line);background:var(--card);border-radius:10px;min-height:130px;padding:14px;font-size:17px;white-space:pre-wrap;word-break:break-all;cursor:pointer}
+.out.empty{color:var(--muted)}
+.hint{color:var(--muted);font-size:13px;text-align:center;margin-top:-12px}
+dialog{border:2px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);max-width:420px;width:92%;padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+table{width:100%;border-collapse:collapse;font-size:14px;text-align:center}
+th,td{padding:4px;border-bottom:1px solid var(--muted)}
+.wrap{max-height:60vh;overflow:auto}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <button class="ib" id="theme" title="Тема">☀</button>
+    <button class="ib" id="tbl" title="Таблица кодов">▦</button>
+  </div>
+  <div class="modes">
+    <button class="mode on" data-m="enc">ввод слова</button>
+    <button class="mode" data-m="dec">ввод кода</button>
+  </div>
+  <div class="inp">
+    <textarea id="in" placeholder="ввод текста"></textarea>
+    <button class="go" id="go" title="Выполнить">➤</button>
+  </div>
+  <div class="out empty" id="out" title="Нажмите, чтобы скопировать">ответ</div>
+  <div class="hint" id="hint"></div>
+</div>
+
+<dialog id="dlg">
+  <div class="wrap"><table id="tb"></table></div>
+  <p style="text-align:right;margin:10px 0 0"><button class="mode" id="close">Закрыть</button></p>
+</dialog>
+
+<script>
+const LAT={A:'00011',B:'11001',C:'01110',D:'01001',E:'00001',F:'01101',G:'11010',H:'10100',I:'00110',J:'01011',K:'01111',L:'10010',M:'11100',N:'01100',O:'11000',P:'10110',Q:'10111',R:'01010',S:'00101',T:'10000',U:'00111',V:'11110',W:'10011',X:'11101',Y:'10101',Z:'10001'};
+const RUS={'А':'00011','Б':'11001','Ц':'01110','Д':'01001','Е':'00001','Ф':'01101','Г':'11010','Х':'10100','И':'00110','Й':'01011','К':'01111','Л':'10010','М':'11100','Н':'01100','О':'11000','П':'10110','Я':'10111','Р':'01010','С':'00101','Т':'10000','У':'00111','Ж':'11110','В':'10011','Ь':'11101','Ы':'10101','З':'10001'};
+const FIG={'-':'00011','?':'11001',':':'01110','3':'00001','Э':'01101','Ш':'11010','Щ':'10100','8':'00110','Ю':'01011','(':'01111',')':'10010','.':'11100',',':'01100','9':'11000','0':'10110','1':'10111','4':'01010',"'":'00101','5':'10000','7':'00111','=':'11110','2':'10011','/':'11101','6':'10101','+':'10001'};
+const FIG_CH={'Ч':'01010'};
+const COMMON={' ':'00100','\r':'01000','\n':'00010'};
+const SWITCH={RUS:'00000',LAT:'11111',FIG:'11011'};
+const TABLES={RUS,LAT,FIG:{...FIG,...FIG_CH}};
+const inv=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[v,k]));
+const REV={RUS:inv(RUS),LAT:inv(LAT),FIG:inv({...FIG_CH,...FIG})};
+const COMMON_REV=inv(COMMON), SWITCH_REV=inv(SWITCH);
+
+function encode(text){
+  const a=[]; let q=null;
+  for(let u of text.toUpperCase().replace(/Ё/g,'Е').replace(/Ъ/g,'Ь')){
+    if(u in COMMON){a.push(COMMON[u]);continue}
+    let w=null;
+    if(u in TABLES.FIG) w='FIG'; else if(u in RUS) w='RUS'; else if(u in LAT) w='LAT';
+    if(!w){a.push('?');continue}
+    if(w!==q){q=w;a.push(SWITCH[w])}
+    a.push(TABLES[w][u]);
+  }
+  return a.join(' ');
+}
+function decode(code){
+  const bits=code.replace(/[^01]/g,'');
+  let s=REV.RUS; const a=[];
+  for(let i=0;i+5<=bits.length;i+=5){
+    const c=bits.slice(i,i+5);
+    if(c in SWITCH_REV){s=REV[SWITCH_REV[c]];continue}
+    if(c in COMMON_REV){a.push(COMMON_REV[c]);continue}
+    a.push(s[c]??'?');
+  }
+  return a.join('');
+}
+
+let mode='enc';
+const $=id=>document.getElementById(id), inp=$('in'), out=$('out'), hint=$('hint');
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.mode[data-m]').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  inp.placeholder=m==='enc'?'ввод текста':'ввод кода (например 00000 00011 …)';
+  hint.textContent=m==='enc'?'Текст → код МТК-2':'Код МТК-2 → текст';
+  run();
+}
+function run(){
+  const v=inp.value;
+  if(!v.trim()){out.textContent='ответ';out.classList.add('empty');return}
+  out.textContent=mode==='enc'?encode(v):decode(v);
+  out.classList.remove('empty');
+}
+document.querySelectorAll('.mode[data-m]').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+$('go').onclick=run;
+inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();run()}});
+out.onclick=()=>{if(!out.classList.contains('empty')){try{navigator.clipboard.writeText(out.textContent);hint.textContent='Скопировано'}catch(e){}}};
+
+$('theme').onclick=()=>{
+  const r=document.documentElement;
+  const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme=dark?'light':'dark';
+  $('theme').textContent=dark?'☀':'☾';
+};
+// таблица кодов
+(function(){
+  let h='<tr><th>Код</th><th>РУС</th><th>LAT</th><th>ЦИФР</th></tr>';
+  const codes=[...new Set([...Object.values(LAT),...Object.values(FIG)])].sort();
+  for(const c of codes) h+=`<tr><td>${c}</td><td>${REV.RUS[c]||''}</td><td>${REV.LAT[c]||''}</td><td>${REV.FIG[c]||''}</td></tr>`;
+  h+=`<tr><td>00100</td><td colspan="3">пробел</td></tr><tr><td>01000</td><td colspan="3">возврат каретки</td></tr><tr><td>00010</td><td colspan="3">перевод строки</td></tr>`;
+  h+=`<tr><td>00000</td><td colspan="3">→ РУС</td></tr><tr><td>11111</td><td colspan="3">→ LAT</td></tr><tr><td>11011</td><td colspan="3">→ цифры</td></tr>`;
+  $('tb').innerHTML=h;
+})();
+$('tbl').onclick=()=>$('dlg').showModal();
+$('close').onclick=()=>$('dlg').close();
+setMode('enc');
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+</script>
+</body>
+</html>
