@@ -4,9 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>МТК-2</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6d4fd6">
-<link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root{--bg:#f4f1fb;--card:#fff;--ink:#1a1a1a;--muted:#6b6780;--acc:#6d4fd6;--line:#1a1a1a;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -130,7 +127,6 @@ $('theme').onclick=()=>{
 $('tbl').onclick=()=>$('dlg').showModal();
 $('close').onclick=()=>$('dlg').close();
 setMode('enc');
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 </script>
 </body>
 </html>
